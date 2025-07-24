@@ -1,0 +1,42 @@
+\begin{table}[t]
+    \centering
+    \begin{tabular}{c  c  c  c  c  c}
+        \hline
+         Centre & Model & Ensemble & $\Delta T$ (1975 to 2019) & $\Delta T$ (1975 to 2024) & TCR \\
+         \hline
+AWI & AWI-CM-1-1-MR & r1i1p1f1 & 0.87 & 1.05 & 2.06 \\
+BCC & BCC-CSM2-MR & r1i1p1f1 & 0.64 & 0.81 & 1.72 \\
+CAMS & CAMS-CSM1-0 & r1i1p1f1 & 0.44 & 0.56 & 1.73 \\
+CAS & FGOALS-g3 & r1i1p1f1 & 0.82 & 0.91 & 1.54 \\
+CAS & FGOALS-f3-L & r1i1p1f1 & 0.70 & 0.90 & 1.94 \\
+CCCma & CanESM5 & r1i1p1f1 & 1.05 & 1.24 & 2.74 \\
+CNRM-CERFACS & CNRM-CM6-1 & r1i1p1f2 & 0.69 & 0.85 & 2.14 \\
+CNRM-CERFACS & CNRM-CM6-1-HR & r1i1p1f2 & 0.69 & 0.84 & 2.48 \\
+CNRM-CERFACS & CNRM-ESM2-1 & r1i1p1f2 & 0.83 & 0.93 & 1.86 \\
+CSIRO & ACCESS-ESM1-5 & r1i1p1f1 & 0.94 & 1.02 & 1.95 \\
+CSIRO-ARCCSS & ACCESS-CM2 & r1i1p1f1 & 0.77 & 0.99 & 2.10 \\
+EC-Earth-Consortium & EC-Earth3-Veg & r1i1p1f1 & 0.81 & 0.96 & 2.62 \\
+EC-Earth-Consortium & EC-Earth3 & r3i1p1f1 & 0.72 & 0.85 & 2.30 \\
+INM & INM-CM5-0 & r1i1p1f1 & 0.55 & 0.71 & 1.40* \\
+INM & INM-CM4-8 & r1i1p1f1 & 0.61 & 0.70 & 1.33 \\
+IPSL & IPSL-CM6A-LR & r1i1p1f1 & 0.90 & 0.99 & 2.32 \\
+MIROC & MIROC6 & r1i1p1f1 & 0.48 & 0.54 & 1.55 \\
+MIROC & MIROC-ES2L & r1i1p1f2 & 0.62 & 0.82 & 1.55 \\
+MOHC & HadGEM3-GC31-LL & r1i1p1f3 & 1.26 & 1.52 & 2.55 \\
+MOHC & UKESM1-0-LL & r1i1p1f2 & 1.22 & 1.44 & 2.79 \\
+MPI-M & MPI-ESM1-2-LR & r1i1p1f1 & 0.62 & 0.74 & 1.84 \\
+MRI & MRI-ESM2-0 & r1i1p1f1 & 0.72 & 0.96 & 1.64 \\
+NASA-GISS & GISS-E2-1-G & r1i1p1f1 & 0.61 & 0.77 & 1.80 \\
+NCAR & CESM2 & r1i1p1f1 & 0.82 & 0.97 & 2.06 \\
+NCAR & CESM2-WACCM & r1i1p1f1 & 0.90 & 1.01 & 1.98 \\
+NCC & NorESM2-MM & r1i1p1f1 & 0.67 & 0.83 & 1.33 \\
+NCC & NorESM2-LM & r1i1p1f1 & 0.82 & 0.88 & 1.48 \\
+NOAA-GFDL & GFDL-ESM4 & r1i1p1f1 & 0.68 & 0.80 & 1.51* \\
+NOAA-GFDL & GFDL-CM4 & r1i1p1f1 & 0.86 & 1.02 & 2.12* \\
+NUIST & NESM3 & r1i1p1f1 & 1.05 & 1.27 & 2.72 \\
+UA & MCM-UA-1-0 & r1i1p1f1 & 0.81 & 0.90 & 1.94 \\
+        \hline
+    \end{tabular}
+    \caption{List of CMIP6 ESMs used in this study. Models with an asterisk (*) still met the criteria but did not have TCR values which were not listed in the IPCC AR6 Chapter 7 appendix, and were therefore calculated directly using the piControl and 1pctCO2 experimental simulations.}
+    \label{tab:CMIP6 Models}
+\end{table}
