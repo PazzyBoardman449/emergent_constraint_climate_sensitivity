@@ -18,6 +18,8 @@ using MTH229
 using SymPy
 using LsqFit
 
+cd(@__DIR__)
+
 ### Plot Settings:
 default(fontfamily="Computer Modern", xlabelfontsize = 8, ylabelfontsize = 8, titlefontsize=12, legendfontsize = 8)
 
@@ -423,7 +425,7 @@ function plot_emergent_constraint_with_distribution(results, ssp_run, period_2, 
         label = "Individual ESMs", 
         color = color,
         title = "$(ssp_run), $(period_2[2]) ",
-        aspect_ratio = .1,
+        #aspect_ratio = .1,
         markerstrokewidth = 0
     )
 
@@ -554,7 +556,7 @@ function produce_single_constraint_future_warming(directory, period_1, end_year,
     #SSP_ΔT_Plot = plot_ΔT_distribution(SSP_ΔT_Results, ssp_run, period_1, period_2, confidence)
     SSP_ΔT_Plot = plot_emergent_constraint_with_distribution(SSP_ΔT_Results, ssp_run, period_2, confidence)
 
-    savefig(SSP_ΔT_Plot, "/Users/pb662/PhD Local FIles/Presentations/Upgrade Viva 14 Jul 2025/Figures/Single_Future_Warming_EC_SSP245.pdf")
+    savefig(SSP_ΔT_Plot, "output/Single_Future_Warming_EC_SSP245.pdf")
 
     return SSP_ΔT_Plot
 end
@@ -586,7 +588,7 @@ function produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(
     end
 
     # Arrange the plots in a 3x4 grid
-    plot_grid = plot(plots..., layout = (3, 4), size = (1000, 1000), legend = false)
+    plot_grid = plot(plots..., layout = (3, 4), size = (1200, 1000), legend = false)
 
     separate_plot = plot(plots[1], 
         title = "",
@@ -601,16 +603,16 @@ function produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(
 
     combined_plot = plot(plot_grid, separate_plot, layout = @layout([a{0.85h}; b]))
 
-    #savefig(combined_plot, "/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Figures/Plots/Future_Warming_EC.pdf")
+    savefig(combined_plot, "output/Future_Warming_EC.pdf")
 
     return combined_plot
 end
 
 #Load in the Directory Path of the ESM Temperature Time Series Runs
-ESM_Directory = "/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Data/Combined Historical and SSP Data"
+ESM_Directory = "data/ESM_historical_runs/"
 
 #Load in the Met Office HadCRUT5 Temperature
-Delta_T_Obs_raw_df = CSV.read("/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Data/Observational Data/Processed/All_Data_Temperature_Anom.csv", DataFrame);
+Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom.csv", DataFrame);
 
 end_year = 2050
 ssp_run = "ssp245"
@@ -623,6 +625,3 @@ confidence = 0.90 # Confidence level
 
 produce_single_constraint_future_warming(ESM_Directory, period_1, end_year, ssp_run, window_size, confidence)
 #produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(ESM_Directory, period_1, end_years, ssp_runs, window_size, confidence)
-
-#Save the Figure
-#savefig("/Users/pb662/PhD Local FIles/Modelling (Julia)/Powerpoint_Figure_4.pdf")

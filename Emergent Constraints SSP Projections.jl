@@ -19,11 +19,13 @@ using SymPy
 using LsqFit
 using StatsPlots
 
+
+cd(@__DIR__)
+
 num_steps = 1000
 
 ### Plot Settings:
 default(fontfamily="Computer Modern", xlabelfontsize = 12, ylabelfontsize = 12, titlefontsize=12, legendfontsize = 10, left_margin = 20px, bottom_margin = 40px)
-#default(fontfamily="Avantgarde", xlabelfontsize = 10, ylabelfontsize = 10, titlefontsize=10, legendfontsize = 8, left_margin = 20px, bottom_margin = 20px)
 
 function movingaverage(X::Vector, window_size::Int)
     half_window = floor(Int, window_size / 2)
@@ -560,6 +562,7 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
             min_vals .+ offset,
             color =:gray,
             linewidth = 0,
+            label = ""
         )
 
 
@@ -638,7 +641,7 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
         size = (1000, 750)    
         )
 
-    savefig(final_plot, "/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Figures/Plots/Delta_T_SSP_Scenarios.pdf")
+    savefig(final_plot, "output/Delta_T_SSP_Scenarios.pdf")
 
     return final_plot
 end
@@ -837,6 +840,8 @@ function produce_constrained_ΔT_time_series_for_all_SSP_Runs_color(directory, D
     # Combine the main plot and the bar plot into a single layout
     combined_plot = plot(plt_main, plt_bar, layout = @layout([a{0.8w} b{0.2w}]))
 
+    savefig(combined_plot, "output/Delta_T_SSP_Scenarios_Combined.pdf")
+
     return combined_plot
 end
 
@@ -1034,21 +1039,21 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
     combined_plot = plot(plt_bar, separate_plot, layout = @layout([a{0.85h} ; b]), size = (1000, 450))
 
     # Add a legend at the bottom of the bar plot
-    savefig(combined_plot, "/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Figures/Plots/Delta_T_SSP_Scenarios_Barplot.pdf")
+    savefig(combined_plot, "output/Delta_T_SSP_Scenarios_Barplot.pdf")
 
     return combined_plot
 end
 
 #Load in the Directory Path of the ESM Temperature Time Series Runs
-ESM_Directory = "/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Data/Combined Historical and SSP Data"
+ESM_Directory = "data/ESM_historical_runs/"
 
 #Load in the Observational Temperature Anomaly Dataset
-Delta_T_Obs_raw_df = CSV.read("/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Data/Observational Data/Processed/All_Data_Temperature_Anom.csv", DataFrame);
+Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom.csv", DataFrame);
 
 window_size = 11 # Window Size
 confidence = 0.90 # Confidence Level
 
-end_year_var = 2000:1:2030  # End years for the time series
+end_year_var = 1980:1:2099  # End years for the time series
 target_years = (2030, 2050, 2090)
 
 period_var = [(1980, end_year) for end_year in end_year_var]
