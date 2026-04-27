@@ -19,13 +19,12 @@ using SymPy
 using LsqFit
 using Printf
 
+# Initialisation:
+
 cd(@__DIR__)
+default(fontfamily="Computer Modern", xlabelfontsize = 10, ylabelfontsize = 10, titlefontsize=10, legendfontsize = 8, left_margin = 30px, bottom_margin = 30px)
 
-### Plot Settings:
-default(fontfamily="Computer Modern", xlabelfontsize = 10, ylabelfontsize = 10, titlefontsize=10, legendfontsize = 8, left_margin = 20px, bottom_margin = 20px)
-
-# ==== Auxuliary Functions === #
-
+#Aux Functions
 function save_as_latex_table(df::DataFrame, output_path::String)
     # Define the models that require an asterisk
     models_with_asterisk = Set(["INM-CM5-0", "GFDL-CM4", "GFDL-ESM4"])
@@ -73,16 +72,16 @@ function gaussian_weights(window_size::Int, sigma::Float64)
     half_window = floor(Int, window_size / 2)
     x = -half_window:half_window
     weights = exp.(-0.5 .* (x ./ sigma).^2)
-    return weights ./ sum(weights)  # Normalize the weights
+    return weights ./ sum(weights) 
 end
 
+#Function which calculates the moving average 
 function movingaverage(X::Vector, window_size::Int)
     half_window = floor(Int, window_size / 2)
     len = length(X)
     Y = similar(X)
     σ_Y = similar(X)
     
-    # Pad the vector to handle the edges
     padded_X = vcat(fill(X[1], half_window), X, fill(X[end], half_window))
     
     for n in 1:len
@@ -99,25 +98,18 @@ end
 function extract_model_and_simulation(filename)
     split_filename = split(basename(filename), "_")
 
-    # Extract Centre: 
     centre = split_filename[3]
 
-    # Extract Model:
     model = split_filename[4]
 
-    # Remove the date range of format YYYYMM-YYYYMM from model
     model = replace(model, r"[0-9]{6}-[0-9]{6}" => "")
-
-    # Extract Simulation:
-    #simulation = split(split_filename[end], ".")[1]
     simulation = split_filename[5]
 
     return centre, model, simulation
 end
 
-# Function to translate confidence interval to a standard deviation σ
+# Function to translate confidence interval to a standard deviation
 function confidence_to_zscore(confidence_level)
-    # Calculate the z-score for the given confidence level
     zscore = quantile(Normal(0, 1), 1 - (1 - confidence_level) / 2)
     return zscore
 end
@@ -126,15 +118,15 @@ end
 function calculate_metric_distribution(Data, Obs_Data, params, s, metric_column)
     
     # Parameters and input values
-    nfitx = 1000  # Number of x values
-    mfity = 1000  # Number of y values
+    nfitx = 1000 
+    mfity = 1000 
 
     # Pre-allocate arrays
     Pxy = zeros(nfitx, mfity)
     Py = zeros(mfity)
 
     # Extract data and parameters
-    ΔT_data = Data.ΔT
+    ΔT_data = Data.ΔT    
     N = length(ΔT_data)
 
     ΔT_Obs_Mean = Obs_Data[1]
@@ -151,7 +143,6 @@ function calculate_metric_distribution(Data, Obs_Data, params, s, metric_column)
 
     # Define the model and ranges based on the metric_column
     f = x -> params[1] + params[2] * x
-    #σ_f = x -> errors[2] * std(ΔT_data) * sqrt(1 + N + ((x - mean(ΔT_data))^2 / (std(ΔT_data))^2))
     σ_f = x ->  s * sqrt(1 + 1/N + ((x - mean(ΔT_data))^2 / (N*std(ΔT_data, corrected=false)^2)))
     x_min, x_max = 0, 2 * mean(ΔT_data)
     y_min, y_max = 0, 2 * mean(Data[:, metric_column])
@@ -171,16 +162,11 @@ function calculate_metric_distribution(Data, Obs_Data, params, s, metric_column)
             x = x_values[n]
             f_x = f(x)
             σ_f_x = σ_f(x)
-            #σ_f_x = sqrt(σ_f(x)^2 + params[2]^2*σ_x^2)
-            #P_y_given_x = pdf(Normal(f(x), σ_f_x), y)
             P_y_given_x = (1/(sqrt(2*pi*σ_f_x^2)))*exp(-(y - f_x)^2/(2*σ_f_x^2))
             Pxy[n, m] = P_x(x) * P_y_given_x
         end
-        # Integrate over x to get Py
         Py[m] = sum(Pxy[:, m] * dx)
     end
-
-    # Intgrate the curve again to obtain the cumulative distributions:
 
     # Normalize Py
     Py_norm = sum(Py) * dy
@@ -190,23 +176,20 @@ function calculate_metric_distribution(Data, Obs_Data, params, s, metric_column)
 
 end
 
-#= Main Procedure Here!!: =#
+#= Main Procedure Here!: =#
 
 #= Stage 1. Function to produce a list of time series data for a given SSP run, smoothed by a given smoothing window. 
 Each dataframe represents a model-simulation run combination. =#
 function extract_data_for_ssp_run(directory_path, ssp_run)
     directory = "$directory_path/$(ssp_run)"
 
-    # Initialise Series of DataFrames
     dataframes = []
 
-    # Store each file in a DataFrame, and create a 3 dimensional array of DataFrames
     for file in readdir(directory)
         if file != ".DS_Store"
             csv_file = CSV.File("$directory/$file")
             df = DataFrame(csv_file)
 
-            # Add a new column called 'Model', which is populated with the model name extracted from the filename
             centre = extract_model_and_simulation(file)[1]
             model = extract_model_and_simulation(file)[2]
             simulation = extract_model_and_simulation(file)[3]
@@ -222,7 +205,7 @@ function extract_data_for_ssp_run(directory_path, ssp_run)
     # Create a dictionary to store the DataFrame with the required simulation conditions for each model
     model_dict = Dict{String, DataFrame}()
 
-    # Add each DataFrame to the dictionary with the lowest alphanumeric Simulation value
+    # Add each DataFrame to the dictionary with the lowest alphanumeric simulation value
     for df in dataframes
         model = df.Model[1]
         simulation = df.Simulation[1]
@@ -259,6 +242,7 @@ function calculate_ESM_warming_trend(dataframes, period, window_size, confidence
         dataframes[i][:, :Smoothed_Surface_Temperature] = movingaverage(dataframes[i][:, :Surface_Temperature], window_size)
 
         dataframes[i][:, :Smoothed_Residuals] = dataframes[i][:, :Surface_Temperature] - dataframes[i][:, :Smoothed_Surface_Temperature]
+
         dataframes[i][:, :Smoothed_Surface_Temperature_err] .= confidence_to_zscore(confidence)*std(dataframes[i][:, :Smoothed_Residuals], corrected = false) / sqrt(window_size)
     end 
 
@@ -292,7 +276,7 @@ function calculate_observed_warming_trend(obs_dataframe, period, window_size)
 
     #Calculate the Internal variability
     obs_dataframe[!, :Resids] = obs_dataframe[!, :Temperature_Anomaly] - obs_dataframe[!, :Smoothed_Temperature_Anomaly]
-    obs_dataframe[!, :Internal_Variability] .= std(obs_dataframe[!, :Resids], corrected = false) / sqrt(window_size)
+    obs_dataframe[!, :Internal_Variability] .= 1*std(obs_dataframe[!, :Resids], corrected = false) / sqrt(window_size)
 
     #Calculate the Measurement Error
     obs_dataframe[!, :Smoothed_Upper_Temperature_Anomaly] = movingaverage(obs_dataframe[!, :Upper_Temperature_Anomaly_Limit], window_size)
@@ -339,7 +323,7 @@ function calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, Metri
     # Combine data
     ESM_Data = innerjoin(Delta_T_ESM_df, Metric_ESM_df, on = :Model)
 
-    # Dynamically identify the Metric column name (assumes the second column is Metric)
+    # identify the Metric column name (assumes the second column is Metric
     metric_column = names(Metric_ESM_df)[end]
     Metric = ESM_Data[!, metric_column]
 
@@ -355,6 +339,7 @@ function calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, Metri
     Obs_Stats = [ΔT_Obs_Mean, ΔT_Obs_Upper, ΔT_Obs_Lower]
     
     ΔT_Mean = mean(ESM_Data.ΔT)
+
     # Generate a range of ΔT values
     ΔT_range = range(0, 2 * ΔT_Mean, length = 1000)
 
@@ -381,10 +366,6 @@ function calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, Metri
     #Extract the Least Squares Sum:
     s = sqrt((1/(N-2))*sum(abs2, residuals(Metric_Reg)))
 
-    #println(N)
-
-    #Print the Equation of the Regression Line:
-    #println("$(metric_column) = $(round(params[1], digits=4)) + $(round(params[2], digits=4)) * ΔT")
 
     # Assuming Metric_Reg is the fitted model and ΔT_range is the range of ΔT values
     Metric_CI = predict(Metric_Reg, DataFrame(ΔT = ΔT_range), interval = :confidence, level = confidence)
@@ -439,190 +420,7 @@ function calculate_emergent_constraint_cumulative(y_vals, Py_vals_norm, confiden
 
 end
 
-### ========  Auxiliary Functions: ======== ###
-
-#Figure 3a: Dependence of Running Mean on Emergent Constraint
-function produce_emergent_constraint_dependence_on_running_mean(directory, period, ssp_run, window_size_var, confidence)
-
-    metric_values = Float64[]
-    metric_lower_bounds = Float64[]
-    metric_upper_bounds = Float64[]
-
-    for window_size in window_size_var
-        All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
-
-        Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
-        Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
-
-        results_df = calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, TCR_ESMs_df, confidence)
-
-        y_vals = results_df[:Metric_Range]
-        Py_vals = results_df[:Metric_vals]
-
-        _, Metric_Median, Metric_Upper_Bound, Metric_Lower_Bound = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
-
-        #Add the results to the results table
-        push!(metric_values, Metric_Median)
-        push!(metric_lower_bounds, Metric_Lower_Bound)
-        push!(metric_upper_bounds, Metric_Upper_Bound)   
-    end
-
-     # Plot the results with confidence interval
-     p = plot(
-        window_size_var,
-        metric_values,
-        xlabel = "Window Size",
-        ylabel = "TCR [K]",
-        xlims = (minimum(window_size_var), maximum(window_size_var)),
-        ylims = (0, maximum(metric_upper_bounds) * 1.1),  # Adjust y-limits dynamically
-        label = "TCR Central Estimate",
-        grid = false,
-        marker = :circle,
-        legend = :bottomright
-    )
-
-    # Add shaded region for confidence interval
-    plot!(
-        p,
-        window_size_var,
-        metric_values,
-        fillbetween = (metric_upper_bounds, metric_lower_bounds),
-        fillalpha = 0.2,
-        label = "$(Int(100 * confidence))% Confidence Range"
-    )
-end
-
-#Figure 3b: Dependence of End Year on Emergent Constraint
-function produce_emergent_constraint_dependence_on_end_year(directory, period_var, ssp_run, window_size, confidence)
-
-    end_year_vals = Float64[]
-    metric_values = Float64[]
-    metric_lower_bounds = Float64[]
-    metric_upper_bounds = Float64[]
-
-    for period in period_var
-        All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
-
-        Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
-        Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
-
-        results_df = calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, TCR_ESMs_df, confidence)
-
-        y_vals = results_df[:Metric_Range]
-        Py_vals = results_df[:Metric_vals]
-
-        _, Metric_Median, Metric_Upper_Bound, Metric_Lower_Bound = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
-
-        #Add the results to the results table
-        push!(end_year_vals, period[2]) 
-        push!(metric_values, Metric_Median)
-        push!(metric_lower_bounds, Metric_Lower_Bound)
-        push!(metric_upper_bounds, Metric_Upper_Bound)   
-    end
-
-     # Plot the results with confidence interval
-     p = plot(
-        end_year_vals,
-        metric_values,
-        xlabel = "End Year",
-        ylabel = "TCR [K]",
-        xlims = (minimum(end_year_vals), maximum(end_year_vals)),
-        ylims = (0, maximum(metric_upper_bounds) * 1.1),  # Adjust y-limits dynamically
-        label = "TCR Central Estimate",
-        grid = false,
-        marker = :circle,
-        legend = :bottomright
-    )
-
-    # Add shaded region for confidence interval
-    plot!(
-        p,
-        end_year_vals,
-        metric_values,
-        fillbetween = (metric_upper_bounds, metric_lower_bounds),
-        fillalpha = 0.2,
-        label = "$(Int(100 * confidence))% Confidence Range"
-    )
-end
-
-#Figure 3c: Dependence of Start Year on Emergent Constraint
-function produce_emergent_constraint_dependence_on_start_year(directory, period_var, ssp_run, window_size, confidence)
-
-    start_year_vals = Float64[]
-    metric_values = Float64[]
-    metric_lower_bounds = Float64[]
-    metric_upper_bounds = Float64[]
-
-    for period in period_var
-        All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
-
-        Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
-        Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
-
-        results_df = calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, TCR_ESMs_df, confidence)
-
-        y_vals = results_df[:Metric_Range]
-        Py_vals = results_df[:Metric_vals]
-
-        _, Metric_Median, Metric_Upper_Bound, Metric_Lower_Bound = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
-
-        #Add the results to the results table
-        push!(start_year_vals, period[1]) 
-        push!(metric_values, Metric_Median)
-        push!(metric_lower_bounds, Metric_Lower_Bound)
-        push!(metric_upper_bounds, Metric_Upper_Bound)   
-    end
-
-     # Plot the results with confidence interval
-     p = plot(
-        start_year_vals,
-        metric_values,
-        xlabel = "Start Year",
-        ylabel = "TCR [K]",
-        xlims = (minimum(start_year_vals), maximum(start_year_vals)),
-        ylims = (0, maximum(metric_upper_bounds) * 1.1),  # Adjust y-limits dynamically
-        label = "TCR Central Estimate",
-        grid = false,
-        marker = :circle,
-        legend = :bottomright
-    )
-
-    # Add shaded region for confidence interval
-    plot!(
-        p,
-        start_year_vals,
-        metric_values,
-        fillbetween = (metric_upper_bounds, metric_lower_bounds),
-        fillalpha = 0.2,
-        label = "$(Int(100 * confidence))% Confidence Range"
-    )
-end
-
-function export_data_to_csv(directory, ssp_run, period, confidence, window_size)
-    # Initialize a DataFrame to store the results
-    #results = DataFrame(Model = String[], Simulation = String[], TCR = Float64[], ΔT = Float64[], ssp_run = String[], Start_Year = Int[], End_Year = Int[], Window_Size = Int[])
-
-    All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
-    Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
-
-    #Inner Join the TCR_ESMs_df with the Delta_T_ESM_df
-    results_df = innerjoin(Delta_T_ESM_df, TCR_ESMs_df, on = :Model)
-
-    #Select the relevant columns
-    results_df = select(results_df, [:Model, :Simulation_Conditions, :TCR, :ΔT])
-
-    #Add the ssp_run, start_year, end_year, and window_size to the DataFrame
-    results_df[!, :ssp_run] .= ssp_run
-    results_df[!, :Start_Year] .= period[1]
-    results_df[!, :End_Year] .= period[2]
-    results_df[!, :Window_Size] .= window_size
-
-    #Export the DataFrame to a CSV file
-    CSV.write("/Users/pb662/PhD Local FIles/Modelling (Julia)/PAPER - The Effects of Recent Warming/Data/Emergent_Constraint_Results_$(ssp_run)_$(period[1])_$(period[2])_$(window_size)_$(Int(100*confidence)).csv", results_df)
-
-end
-
-### ========  Main Functions for Plots for Paper: ======== ###
+# =  Main Functions for Plots for Paper: #
 
 # Table 1: Export a text file which has the TCR values for each ESM.
 function produce_TCR_table(directory, ssp_run, period_1, period_2, window_size, confidence)
@@ -752,7 +550,6 @@ function produce_ΔT_time_series_plot_for_SSP_Run_One_Period(directory, Delta_T_
         fillcolor = :red,
         label = "Observed ΔT",
         seriestype = :line,
-        #color = :transparent,
         linecolor = :black,
         linewidth = 2,
         alpha = 0.3,
@@ -776,7 +573,7 @@ function produce_ΔT_time_series_plot_for_SSP_Run_One_Period(directory, Delta_T_
     TCR_plots = plot(plt, colorbar_plot, layout = @layout([a{0.95w} b{0.05w}]))  # Set the legend to have two column)
 
     # Save the combined plot
-    savefig(TCR_plots, "output/ΔT_time_series_plot_one_period.pdf")
+    savefig(TCR_plots, "output/ΔT_time_series_plot_One_Period.pdf")
 
     return TCR_plots
 end
@@ -1000,7 +797,7 @@ function produce_ΔT_time_series_plot_for_SSP_Run_Two_Periods(directory, Delta_T
     )
 
     # Save the combined plot
-    savefig(combined_plot, "output/ΔT_time_series_plot_two_periods.pdf")
+    savefig(combined_plot, "output/ΔT_time_series_plot.pdf")
 
     return combined_plot
 end
@@ -1056,14 +853,10 @@ function produce_emergent_constraint_plot(directory, period_1, period_2, ssp_run
     scatter!(
         ESM_Data_1.ΔT,
         ESM_Data_1[!, Metric_Column],
-        #xlabel=L"$\\Delta T$ [K]",
-        #ylabel="\$ y \$",
         color =color1,
-        #label="ESMs $(period_1[1]) - $(period_1[2]) (\$n=\$ $(size(ESM_Data_1, 1)))",
         label = "ESMs"
     )
 
-    
 
     # Plot the curve of best fit
     plot!(
@@ -1073,8 +866,6 @@ function produce_emergent_constraint_plot(directory, period_1, period_2, ssp_run
         fillbetween = (Metric_PI_1.upper - Metric_PI_1.prediction, Metric_PI_1.prediction - Metric_PI_1.lower),
         fillalpha = 0.2, 
         fillcolor = color1,
-        #label = "Regression $(period_1[1]) - $(period_1[2]) (\$r=\$ $(round(r_value_1, digits=2)))",
-        #label = "OLS Linear Fit",
         color=color1
     )
 
@@ -1082,16 +873,13 @@ function produce_emergent_constraint_plot(directory, period_1, period_2, ssp_run
     plot!(
         ΔT_range_1,
         Metric_PI_1.prediction,
-        #ribbon = (Metric_PI_1.upper - Metric_PI_1.prediction, Metric_PI_1.prediction - Metric_PI_1.lower),
         fillbetween = (Metric_PI_1.upper - Metric_PI_1.prediction, Metric_PI_1.prediction - Metric_PI_1.lower),
         fillalpha = 0.2, 
         fillcolor = color1,
-        #label = "Regression $(period_1[1]) - $(period_1[2]) (\$r=\$ $(round(r_value_1, digits=2)))",
         label = "OLS Linear Fit",
         color=color1
     )
 
-    
     # Add vertical dashed line for observed ΔT
     vline!(
         [ΔT_Obs_1],
@@ -1101,14 +889,11 @@ function produce_emergent_constraint_plot(directory, period_1, period_2, ssp_run
         linestyle=:dash
     )
 
-
     vspan!(
         [ΔT_Obs_Lower_1, ΔT_Obs_Upper_1],
         fillalpha=0.2,
         fillcolor=color1
         )
-
-    
 
 
     hline!(
@@ -1120,13 +905,6 @@ function produce_emergent_constraint_plot(directory, period_1, period_2, ssp_run
     )
 
     plot!(Py_vals_1_norm, y_vals_1, label="", color=color1)
-    #plot!(Py_vals_2_norm, y_vals_2, label="$(Metric_Column) Prediction $(period_2[1]) - $(period_2[2])", color=:purple)
-    
-    
-    # Save the figure as PDF
-    savefig(plot, "output/EC_TCR.pdf")
-    
-    return plot
     
 end
 
@@ -1144,13 +922,11 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
     Delta_T_Obs_period1_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period_1, window_size)
     Delta_T_Obs_period2_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period_2, window_size)
 
-
     # Determine the appropriate ESM dataframe and plot settings
     metric_df = TCR_ESMs_df
 
     results_period1_df = calculate_emergent_constraint_GLM(Delta_T_ESM_period1_df, Delta_T_Obs_period1_df, metric_df, confidence)
     results_period2_df = calculate_emergent_constraint_GLM(Delta_T_ESM_period2_df, Delta_T_Obs_period2_df, metric_df, confidence)
-
 
     # Extract results
     Metric_Column = results_period1_df[:Metric_Column]
@@ -1163,6 +939,7 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
     ΔT_Obs_Upper_1 = results_period1_df[:ΔT_Obs_Upper]
     ΔT_Obs_Lower_1 = results_period1_df[:ΔT_Obs_Lower]
     ESM_Data_1 = results_period1_df[:ESM_Data]
+    r_value_1 = results_period1_df[:r_value]
     Py_vals_1 = results_period1_df[:Metric_vals]
 
     # Extract results for the second period
@@ -1173,6 +950,7 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
     ΔT_Obs_Upper_2 = results_period2_df[:ΔT_Obs_Upper]
     ΔT_Obs_Lower_2 = results_period2_df[:ΔT_Obs_Lower]
     ESM_Data_2 = results_period2_df[:ESM_Data]
+    r_value_2 = results_period2_df[:r_value]
     Py_vals_2 = results_period2_df[:Metric_vals]
 
     _, Metric_Median_1, Metric_Upper_Bound_1, Metric_Lower_Bound_1 = calculate_emergent_constraint_cumulative(y_vals_1, Py_vals_1, confidence)
@@ -1188,31 +966,64 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
     default(label=false)
 
     plot_comparison = scatter(
-        xlims=(minimum(ΔT_range_1), maximum(ΔT_range_1)),
+        xlims=(0,0.45),
         ylims=(minimum(y_vals_1), maximum(y_vals_1)),
-        xlabel="ΔT [K]",
+        xlabel="ΔT /10 yr [Kyr\$^{-1}\$]",
         ylabel="$(Metric_Column) [K]",
         title="",
         #title="Emergent Constraint on $(Metric_Column)",
-        aspect_ratio = .4,
+        aspect_ratio = .11,
         grid=false)
 
+    #println(10*ESM_Data_1.ΔT/(period_1[2]-period_1[1]))
+
     scatter!(
-        ESM_Data_1.ΔT,
+        10*ESM_Data_1.ΔT/(period_1[2]-period_1[1]),
         ESM_Data_1[!, Metric_Column],
         color = color1,
         label = "CMIP6 ESMs"
     )
 
     scatter!(
-        ESM_Data_2.ΔT,
+        10*ESM_Data_2.ΔT/(period_2[2]-period_2[1]),
         ESM_Data_2[!, Metric_Column],
         color = color2,
     )
 
+    annotate!(0.26, 0.45,
+    text(
+        "●",
+        font("Computer Modern", 10),
+        color1
+    )
+    )
+
+    annotate!(0.35, 0.45,
+    text(
+        "1975–2019: r = $(round(r_value_1, digits=2))",
+        font("Computer Modern", 8)
+    )
+    )
+
+    annotate!(0.26, 0.25,
+    text(
+        "●",
+        font("Computer Modern", 10),
+        color2
+    )
+    )
+
+    annotate!(0.35, 0.25,
+        text(
+            "1975–2024: r = $(round(r_value_2, digits=2))",
+            font("Computer Modern", 8)
+        )
+    )
+
+
     # Plot the curve of best fit
     plot!(
-        ΔT_range_1,
+        10*ΔT_range_1/(period_1[2]-period_1[1]),
         Metric_PI_1.prediction,
         ribbon = (Metric_PI_1.upper - Metric_PI_1.prediction, Metric_PI_1.prediction - Metric_PI_1.lower),
         fillalpha = 0.2, 
@@ -1225,19 +1036,19 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
 
     # Plot the curve of best fit
     plot!(
-        ΔT_range_2,
+        10*ΔT_range_2/(period_2[2]-period_2[1]),
         Metric_PI_2.prediction,
         ribbon = (Metric_PI_2.upper - Metric_PI_2.prediction, Metric_PI_2.prediction - Metric_PI_2.lower),
         fillalpha = 0.2,
         fillcolor = color2,
-        #label = "Regression $(period_1[1]) - $(period_1[2]) (\$r=\$ $(round(r_value_1, digits=2)))",
+        #label = "Regression $(period_2[1]) - $(period_2[2]) (\$r=\$ $(round(r_value_2, digits=2)))",
         color=color2,
         linewidth = 1
     )
 
     # Add vertical dashed line for observed ΔT
     vline!(
-        [ΔT_Obs_1],
+        [10*ΔT_Obs_1/(period_1[2]-period_1[1])],
         #label="\$Δ T_{Obs} \$ $(period_1[1]) - $(period_1[2]): $(round(ΔT_Obs_1, digits=2))K",
         label="Observed ΔT",
         color=color1,
@@ -1247,7 +1058,7 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
 
     # Add vertical dashed line for observed ΔT
     vline!(
-        [ΔT_Obs_2],
+        [10*ΔT_Obs_2/(period_2[2]-period_2[1])],
         #label="\$Δ T_{Obs} \$ $(period_1[1]) - $(period_1[2]): $(round(ΔT_Obs_1, digits=2))K",
         color=color2,
         linewidth = 1,
@@ -1255,14 +1066,14 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
     )
 
     vspan!(
-        [ΔT_Obs_Lower_1, ΔT_Obs_Upper_1],
+        [10*ΔT_Obs_Lower_1/(period_1[2]-period_1[1]), 10*ΔT_Obs_Upper_1/((period_1[2]-period_1[1]))],
         fillalpha=0.2,
         fillcolor=color1,
         strokealpha=0
         )
 
     vspan!(
-        [ΔT_Obs_Lower_2, ΔT_Obs_Upper_2],
+        [10*ΔT_Obs_Lower_2/(period_2[2]-period_2[1]), 10*ΔT_Obs_Upper_2/((period_2[2]-period_2[1]))],
         fillalpha=0.2,
         fillcolor=color2,
         strokealpha=0
@@ -1340,7 +1151,7 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
         
         
         plot!(y_vals_1, Py_vals_1, 
-                label="EC $(period_1[1]) - $(period_1[2])", 
+                label="EC $(period_1[1] - Int(floor(window_size/2))) - $(period_1[2] + Int(floor(window_size/2)))", 
                 color=color1,
                 xlabel="$(Metric_Column) [K]",
                 ylabel= "PDF($(Metric_Column)) [K\$^{-1}\$]",  # Correct LaTeX syntax for superscript
@@ -1352,7 +1163,7 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
             )
 
         plot!(y_vals_2, Py_vals_2, 
-        label="EC $(period_2[1]) - $(period_2[2])", 
+        label="EC $(period_2[1] - Int(floor(window_size/2))) - $(period_2[2] + Int(floor(window_size/2)))", 
         color= color2,
         linewidth = 1,
         )
@@ -1381,13 +1192,195 @@ function produce_combined_emergent_constraint_comparison_plots(directory, period
     size = (900, 405)
     )
 
-    savefig(combined_plot, "output/EC_TCR_Comparison.pdf")
+    savefig(combined_plot, "output/Emergent_Constraint_Comparison.pdf")
 
     return combined_plot
 end
 
+#=  Functions for Supplementry Materia, =#
+
+#Figure 3a: Dependence of Running Mean on Emergent Constraint
+function produce_emergent_constraint_dependence_on_running_mean(directory, period, ssp_run, window_size_var, confidence)
+
+    metric_values = Float64[]
+    metric_lower_bounds = Float64[]
+    metric_upper_bounds = Float64[]
+
+    for window_size in window_size_var
+        All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
+
+        Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
+        Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
+
+        results_df = calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, TCR_ESMs_df, confidence)
+
+        y_vals = results_df[:Metric_Range]
+        Py_vals = results_df[:Metric_vals]
+
+        _, Metric_Median, Metric_Upper_Bound, Metric_Lower_Bound = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+
+        #Add the results to the results table
+        push!(metric_values, Metric_Median)
+        push!(metric_lower_bounds, Metric_Lower_Bound)
+        push!(metric_upper_bounds, Metric_Upper_Bound)   
+    end
+
+     # Plot the results with confidence interval
+     p = plot(
+        window_size_var,
+        metric_values,
+        xlabel = "Window Size",
+        ylabel = "TCR [K]",
+        xlims = (minimum(window_size_var), maximum(window_size_var)),
+        ylims = (0, maximum(metric_upper_bounds) * 1.1),  # Adjust y-limits dynamically
+        label = "TCR Central Estimate",
+        grid = false,
+        marker = :circle,
+        legend = :bottomright
+    )
+
+    # Add shaded region for confidence interval
+    plot!(
+        p,
+        window_size_var,
+        metric_values,
+        fillbetween = (metric_upper_bounds, metric_lower_bounds),
+        fillalpha = 0.2,
+        label = "$(Int(100 * confidence))% Confidence Range"
+    )
+end
+
+#Figure 3b: Dependence of End Year on Emergent Constraint
+function produce_emergent_constraint_dependence_on_end_year(directory, period_var, ssp_run, window_size, confidence)
+
+    end_year_vals = Float64[]
+    metric_values = Float64[]
+    metric_lower_bounds = Float64[]
+    metric_upper_bounds = Float64[]
+
+    for period in period_var
+        All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
+
+        Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
+        Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
+
+        results_df = calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, TCR_ESMs_df, confidence)
+
+        y_vals = results_df[:Metric_Range]
+        Py_vals = results_df[:Metric_vals]
+
+        _, Metric_Median, Metric_Upper_Bound, Metric_Lower_Bound = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+
+        #Add the results to the results table
+        push!(end_year_vals, period[2]) 
+        push!(metric_values, Metric_Median)
+        push!(metric_lower_bounds, Metric_Lower_Bound)
+        push!(metric_upper_bounds, Metric_Upper_Bound)   
+    end
+
+     # Plot the results with confidence interval
+     p = plot(
+        end_year_vals,
+        metric_values,
+        xlabel = "End Year",
+        ylabel = "TCR [K]",
+        xlims = (minimum(end_year_vals), maximum(end_year_vals)),
+        ylims = (0, maximum(metric_upper_bounds) * 1.1),  # Adjust y-limits dynamically
+        label = "TCR Central Estimate",
+        grid = false,
+        marker = :circle,
+        legend = :bottomright
+    )
+
+    # Add shaded region for confidence interval
+    plot!(
+        p,
+        end_year_vals,
+        metric_values,
+        fillbetween = (metric_upper_bounds, metric_lower_bounds),
+        fillalpha = 0.2,
+        label = "$(Int(100 * confidence))% Confidence Range"
+    )
+end
+
+#Figure 3c: Dependence of Start Year on Emergent Constraint
+function produce_emergent_constraint_dependence_on_start_year(directory, period_var, ssp_run, window_size, confidence)
+
+    start_year_vals = Float64[]
+    metric_values = Float64[]
+    metric_lower_bounds = Float64[]
+    metric_upper_bounds = Float64[]
+
+    for period in period_var
+        All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
+
+        Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
+        Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
+
+        results_df = calculate_emergent_constraint_GLM(Delta_T_ESM_df, Delta_T_Obs_df, TCR_ESMs_df, confidence)
+
+        y_vals = results_df[:Metric_Range]
+        Py_vals = results_df[:Metric_vals]
+
+        _, Metric_Median, Metric_Upper_Bound, Metric_Lower_Bound = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+
+        #Add the results to the results table
+        push!(start_year_vals, period[1]) 
+        push!(metric_values, Metric_Median)
+        push!(metric_lower_bounds, Metric_Lower_Bound)
+        push!(metric_upper_bounds, Metric_Upper_Bound)   
+    end
+
+     # Plot the results with confidence interval
+     p = plot(
+        start_year_vals,
+        metric_values,
+        xlabel = "Start Year",
+        ylabel = "TCR [K]",
+        xlims = (minimum(start_year_vals), maximum(start_year_vals)),
+        ylims = (0, maximum(metric_upper_bounds) * 1.1),  # Adjust y-limits dynamically
+        label = "TCR Central Estimate",
+        grid = false,
+        marker = :circle,
+        legend = :bottomright
+    )
+
+    # Add shaded region for confidence interval
+    plot!(
+        p,
+        start_year_vals,
+        metric_values,
+        fillbetween = (metric_upper_bounds, metric_lower_bounds),
+        fillalpha = 0.2,
+        label = "$(Int(100 * confidence))% Confidence Range"
+    )
+end
+
+function export_data_to_csv(directory, ssp_run, period, confidence, window_size)
+    # Initialize a DataFrame to store the results
+    #results = DataFrame(Model = String[], Simulation = String[], TCR = Float64[], ΔT = Float64[], ssp_run = String[], Start_Year = Int[], End_Year = Int[], Window_Size = Int[])
+
+    All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
+    Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
+
+    #Inner Join the TCR_ESMs_df with the Delta_T_ESM_df
+    results_df = innerjoin(Delta_T_ESM_df, TCR_ESMs_df, on = :Model)
+
+    #Select the relevant columns
+    results_df = select(results_df, [:Model, :Simulation_Conditions, :TCR, :ΔT])
+
+    #Add the ssp_run, start_year, end_year, and window_size to the DataFrame
+    results_df[!, :ssp_run] .= ssp_run
+    results_df[!, :Start_Year] .= period[1]
+    results_df[!, :End_Year] .= period[2]
+    results_df[!, :Window_Size] .= window_size
+
+    #Export the DataFrame to a CSV file
+    CSV.write("output/Emergent_Constraint_Results_$(ssp_run)_$(period[1])_$(period[2])_$(window_size)_$(Int(100*confidence)).csv", results_df)
+end
+
 #Figure S1: Emergent Constraint Dependence on Start Year, End Year, and Running Mean
-function plot_emergent_constraints_side_by_side(directory, period, ssp_run, window_size, confidence, period_var_start, period_var_end, window_size_var)
+function plot_TCR_Robustness(directory, period, ssp_run, window_size, confidence, period_var_start, period_var_end, window_size_var)
     # Generate the individual plots
     plot1 = produce_emergent_constraint_dependence_on_start_year(directory, period_var_start, ssp_run, window_size, confidence)
     plot2 = produce_emergent_constraint_dependence_on_running_mean(directory, period, ssp_run, window_size_var, confidence)
@@ -1400,25 +1393,25 @@ function plot_emergent_constraints_side_by_side(directory, period, ssp_run, wind
         size = (1500, 400)          # Adjust the size of the combined plot
     )
 
-    savefig(combined_plot, "output/TCR_Robustness.pdf")
+    savefig(combined_plot, "output/Robustness_Check_$(window_size)yr_mean.pdf")
 
     return combined_plot
 end
 
 # All Custom Parameters Here!: 
 
-#Load in the Directory Path of the ESM Temperature Time Series Runs
-ESM_Directory = "data/ESM_historical_runs/"
+# Load in the Directory Path of the ESM Temperature Time Series Runs
+ESM_Directory = "data/ESM_historical_runs"
 
-#Load in Observational Data
-Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom.csv", DataFrame);
+# Load in Observational Data
+Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom.csv", DataFrame)
 
 #Load in the TCR Results
-TCR_ESMs_df = CSV.read("data/TCR_Results_IPCC.csv", DataFrame);
+TCR_ESMs_df = CSV.read("data/TCR_Results_IPCC.csv", DataFrame)
 
 window_size = 11
 end_year_1 = 2014
-end_year_2 = 2019 #Int(2024 - floor(window_size/2))
+end_year_2 = 2019 
 
 period_1 = (1980, end_year_1)
 period_2 = (1980, end_year_2)
@@ -1442,6 +1435,5 @@ confidence = 0.90 # Confidence Level
 #produce_TCR_table(ESM_Directory, ssp_run, period_1, period_2, window_size, confidence)
 #produce_ΔT_time_series_plot_for_SSP_Run_One_Period(ESM_Directory, Delta_T_Obs_raw_df, ssp_run, window_size, period_var_2, confidence, TCR_ESMs_df)
 #produce_ΔT_time_series_plot_for_SSP_Run_Two_Periods(ESM_Directory, Delta_T_Obs_raw_df, ssp_run, window_size, period_var_1, period_var_2, confidence, TCR_ESMs_df)
-#produce_emergent_constraint_plot(ESM_Directory, period_1, period_2, ssp_run, window_size, confidence, "TCR")
-#produce_combined_emergent_constraint_comparison_plots(ESM_Directory, period_1, period_2, ssp_run, window_size, confidence)
-plot_emergent_constraints_side_by_side(ESM_Directory, period_2, ssp_run, window_size, confidence, period_var_start, period_var_end, mean_window_var)
+produce_combined_emergent_constraint_comparison_plots(ESM_Directory, period_1, period_2, ssp_run, window_size, confidence)
+#plot_TCR_Robustness(ESM_Directory, period_2, ssp_run, window_size, confidence, period_var_start, period_var_end, mean_window_var)

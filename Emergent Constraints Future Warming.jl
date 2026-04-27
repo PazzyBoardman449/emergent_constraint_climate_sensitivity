@@ -17,14 +17,14 @@ using Distributions
 using MTH229
 using SymPy
 using LsqFit
+using Colors
 
+
+#Initialisation
 cd(@__DIR__)
-
-### Plot Settings:
 default(fontfamily="Computer Modern", xlabelfontsize = 8, ylabelfontsize = 8, titlefontsize=12, legendfontsize = 8)
 
 num_steps = 1000
-
 
 function movingaverage(X::Vector, window_size::Int)
     half_window = floor(Int, window_size / 2)
@@ -118,7 +118,6 @@ function calculate_distribution(Data, Obs_Data, params, s)
             x = x_values[n]
             f_x = f(x)
             σ_f_x = σ_f(x)
-            #P_y_given_x = pdf(Normal(f(x), σ_f_x), y)
             P_y_given_x = (1/(sqrt(2*pi*σ_f_x^2)))*exp(-(y - f_x)^2/(2*σ_f_x^2))
             Pxy[n, m] = P_x(x) * P_y_given_x
         end
@@ -380,8 +379,210 @@ function calculate_emergent_constraint_cumulative(y_vals, Py_vals_norm, confiden
 end
 
 
-### ========  Auxiliary Plotting Functions: ======== ###
+#=  Auxiliary Plotting Functions: =#
+function plot_emergent_constraint_with_distribution_single(results, ssp_run, period_2, confidence)
+
+    # Define the color scheme for each SSP run
+    color_scheme = Dict(
+        "ssp126" => "#02D977",
+        "ssp245" => "#BFEB64",
+        "ssp370" => "#FFAE65",
+        "ssp585" => "#FF7764"
+    )
+
+
+    # Extract results
+    r_value = results[:r_value]
+    ΔT_SSP_CI = results[:ΔT_SSP_CI]
+    ΔT_SSP_PI = results[:ΔT_SSP_PI]
+    ΔT_range = results[:ΔT_range]
+    ΔT_per_decade_range = results[:ΔT_per_decade_range]
+    ΔT_Obs = results[:ΔT_Obs]
+    ΔT_Obs_Upper = results[:ΔT_Obs_Upper]
+    ΔT_Obs_Lower = results[:ΔT_Obs_Lower]
+    ΔT_Obs_Per_Decade = results[:ΔT_Obs_Per_Decade]
+    ΔT_Obs_Per_Decade_Upper = results[:ΔT_Obs_Per_Decade_Upper]
+    ΔT_Obs_Per_Decade_Lower = results[:ΔT_Obs_Per_Decade_Lower]
+    ESM_Data = results[:ESM_Data]
+    y_vals = results[:ΔT_SSP_Range]
+    Py_vals = results[:P_ΔT_SSP_vals]
+    Py_vals_norm = results[:P_ΔT_SSP_vals_norm]
+
+    # Get the color for the current SSP run
+    color = color_scheme[ssp_run]
+ 
+    _, ΔT_SSP_Median, ΔT_SSP_Upper, ΔT_SSP_Lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+
+
+    # Create or overlay the plot
+    plot = scatter(
+        xlims=(minimum(ΔT_per_decade_range), maximum(ΔT_per_decade_range)),
+        xlabel=L"$\ \Delta T \$ /10yr  [K yr$^{-1}\$]",
+        ylabel=" ΔT [K]",
+        grid = false,
+        label = "Individual ESMs 1975-2024", 
+        color = color,
+        title = "$(ssp_run), $(period_2[2]) ",
+        aspect_ratio = .1,
+        markerstrokewidth = 0
+    )
+
+
+    scatter!(
+        plot,
+        ESM_Data.ΔT_per_decade,
+        ESM_Data.ΔT_SSP;
+        label = "Individual ESMs (1975 - 2024)",
+        color = color,
+        markerstrokewidth = 0.1
+    )
+
+    plot!(
+        plot,
+        ΔT_per_decade_range,
+        ΔT_SSP_PI.prediction;
+        ribbon = (
+            ΔT_SSP_PI.upper .- ΔT_SSP_PI.prediction,
+            ΔT_SSP_PI.prediction .- ΔT_SSP_PI.lower
+        ),
+        label = "OLS Linear Fit (1975 - 2024)",
+        color = color,
+        fillalpha = 0.2,
+        fillcolor = color
+    )
+
+    # Plot the curve of best fit
+    plot!(
+        label = "OLS Linear Fit (1975 - 2024)", 
+        color = color,
+        fillalpha = 0.2, 
+        fillcolor = color
+    )
+    
+    # Add vertical dashed line for observed ΔT
+    vline!(
+        [ΔT_Obs_Per_Decade],
+        label = false,
+        color = :black,
+        linestyle = :dash,
+        linewidth = 0.8
+    )
+
+    # Add shaded region for observed ΔT range
+    vspan!(
+        [ΔT_Obs_Per_Decade_Upper, ΔT_Obs_Per_Decade_Lower],
+        fillalpha = 0.1,
+        label = "",
+        #label = "\$ ΔT_{Obs}\$/10yr : $(round(ΔT_Obs_Per_Decade, digits = 2))",
+        fillcolor = :gray
+    )
+
+    hline!([ΔT_SSP_Median], color= color, linewidth = 1, label = false, linestyle =:dash
+            #label = "\$ΔT($(period_2[2])) \$: $(round(ΔT_SSP_Median, digits = 2))"
+    )
+
+    #=
+    hspan!([ΔT_SSP_Lower, ΔT_SSP_Upper], alpha = .1 , color= color, label = ""
+        #label = "90% CI: $(round(ΔT_SSP_Lower, digits = 2)) - $(round(ΔT_SSP_Upper, digits = 2))")
+    )
+     =#
+
+    
+    #plot!(Py_vals_norm, y_vals, label = false, style =:dash, color = "#902CB7")
+
+    return plot
+end
+
 function plot_emergent_constraint_with_distribution(results, ssp_run, period_2, confidence)
+
+    # Define the color scheme for each SSP run
+    color_scheme = Dict(
+        "ssp126" => "#02D977",
+        "ssp245" => "#BFEB64",
+        "ssp370" => "#FFAE65",
+        "ssp585" => "#FF7764"
+    )
+
+
+    # Extract results
+    r_value = results[:r_value]
+    ΔT_SSP_CI = results[:ΔT_SSP_CI]
+    ΔT_SSP_PI = results[:ΔT_SSP_PI]
+    ΔT_range = results[:ΔT_range]
+    ΔT_per_decade_range = results[:ΔT_per_decade_range]
+    ΔT_Obs = results[:ΔT_Obs]
+    ΔT_Obs_Upper = results[:ΔT_Obs_Upper]
+    ΔT_Obs_Lower = results[:ΔT_Obs_Lower]
+    ΔT_Obs_Per_Decade = results[:ΔT_Obs_Per_Decade]
+    ΔT_Obs_Per_Decade_Upper = results[:ΔT_Obs_Per_Decade_Upper]
+    ΔT_Obs_Per_Decade_Lower = results[:ΔT_Obs_Per_Decade_Lower]
+    ESM_Data = results[:ESM_Data]
+    y_vals = results[:ΔT_SSP_Range]
+    Py_vals = results[:P_ΔT_SSP_vals]
+    Py_vals_norm = results[:P_ΔT_SSP_vals_norm]
+
+    # Get the color for the current SSP run
+    color = color_scheme[ssp_run]
+ 
+    _, ΔT_SSP_Median, ΔT_SSP_Upper, ΔT_SSP_Lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+
+
+    # Create or overlay the plot
+    plot = scatter(
+        xlims=(minimum(ΔT_per_decade_range), maximum(ΔT_per_decade_range)),
+        xlabel=L"$\ \Delta T \$ /10yr  [K yr$^{-1}\$]",
+        ylabel=" ΔT [K]",
+        grid = false,
+        label = "Individual ESMs 1975-2024", 
+        color = color,
+        title = "$(ssp_run), $(period_2[2]) ",
+        markerstrokewidth = 0
+    )
+
+
+    # Plot the curve of best fit
+    plot!(
+        label = "OLS Linear Fit (1975 - 2024)", 
+        color = color,
+        fillalpha = 0.2, 
+        fillcolor = color
+    )
+    
+    # Add vertical dashed line for observed ΔT
+    vline!(
+        [ΔT_Obs_Per_Decade],
+        label = false,
+        color = :black,
+        linestyle = :dash,
+        linewidth = 0.8
+    )
+
+    # Add shaded region for observed ΔT range
+    vspan!(
+        [ΔT_Obs_Per_Decade_Upper, ΔT_Obs_Per_Decade_Lower],
+        fillalpha = 0.1,
+        label = "",
+        #label = "\$ ΔT_{Obs}\$/10yr : $(round(ΔT_Obs_Per_Decade, digits = 2))",
+        fillcolor = :gray
+    )
+
+    hline!([ΔT_SSP_Median], color= color, linewidth = 1, label = false, linestyle =:dash
+            #label = "\$ΔT($(period_2[2])) \$: $(round(ΔT_SSP_Median, digits = 2))"
+    )
+
+    #=
+    hspan!([ΔT_SSP_Lower, ΔT_SSP_Upper], alpha = .1 , color= color, label = ""
+        #label = "90% CI: $(round(ΔT_SSP_Lower, digits = 2)) - $(round(ΔT_SSP_Upper, digits = 2))")
+    )
+     =#
+
+    
+    #plot!(Py_vals_norm, y_vals, label = false, style =:dash, color = "#902CB7")
+
+    return plot
+end
+
+function plot_emergent_constraint_with_distribution!(p, results, ssp_run, period_2, confidence)
 
     # Define the color scheme for each SSP run
     color_scheme = Dict(
@@ -406,92 +607,96 @@ function plot_emergent_constraint_with_distribution(results, ssp_run, period_2, 
     ESM_Data = results[:ESM_Data]
     y_vals = results[:ΔT_SSP_Range]
     Py_vals = results[:P_ΔT_SSP_vals]
-    Py_vals_norm = results[:P_ΔT_SSP_vals_norm]
 
     # Get the color for the current SSP run
     color = color_scheme[ssp_run]
 
-    _, ΔT_SSP_Median, ΔT_SSP_Upper, ΔT_SSP_Lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+    _, ΔT_SSP_Median, ΔT_SSP_Upper, ΔT_SSP_Lower =
+        calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
 
-    # Create or overlay the plot
-    plot = scatter(
+    println("1975 - 2024 $(ssp_run) $(period_2)"*"$(ΔT_SSP_Lower), $(ΔT_SSP_Median), $(ΔT_SSP_Upper)")
+
+    # ---- Overlay elements ----
+
+    
+    scatter!(
+        p,
         ESM_Data.ΔT_per_decade,
-        ESM_Data.ΔT_SSP,
-        xlims=(minimum(ΔT_per_decade_range), maximum(ΔT_per_decade_range)),
-        xlabel=L"$\ \Delta T \$ /10yr  [K yr$^{-1}\$]",
-        ylabel=" ΔT [K]",
-        grid = false,
-        #label = "n = $(size(ESM_Data, 1))",
-        label = "Individual ESMs", 
+        ESM_Data.ΔT_SSP;
+        label = "Individual ESMs (1975 - 2024)",
         color = color,
-        title = "$(ssp_run), $(period_2[2]) ",
-        #aspect_ratio = .1,
-        markerstrokewidth = 0
-    )
-
-    # Plot the curve of best fit
-    plot!(
-        ΔT_per_decade_range,
-        ΔT_SSP_PI.prediction,
-        ribbon = (ΔT_SSP_PI.upper - ΔT_SSP_PI.prediction, ΔT_SSP_PI.prediction - ΔT_SSP_PI.lower),
-        label = "OLS Linear Fit", 
-        color = color,
-        #label = "r = $(round(r_value, digits = 2))",
-        fillalpha = 0.2, 
-        fillcolor = color
-    )
-
-    #=
-
-    plot!(
-        ΔT_per_decade_range,
-        ΔT_SSP_CI.prediction,
-        ribbon = (ΔT_SSP_CI.upper - ΔT_SSP_CI.prediction, ΔT_SSP_CI.prediction - ΔT_SSP_CI.lower),
-        label = false,
-        fillalpha = 0.4, 
-        fillcolor = color
-    )
-    =#
-
-    plot!(
-        ΔT_per_decade_range,
-        ΔT_SSP_CI.prediction,
-        label = "",
-        color = color
+        markerstrokewidth = 0.1
     )
     
-    # Add vertical dashed line for observed ΔT
+
+    plot!(
+        p,
+        ΔT_per_decade_range,
+        ΔT_SSP_PI.prediction;
+        ribbon = (
+            ΔT_SSP_PI.upper .- ΔT_SSP_PI.prediction,
+            ΔT_SSP_PI.prediction .- ΔT_SSP_PI.lower
+        ),
+        label = "OLS Linear Fit (1975 - 2024)",
+        color = color,
+        fillalpha = 0.2,
+        fillcolor = color
+    )
+
+    plot!(
+        p,
+        ΔT_per_decade_range,
+        ΔT_SSP_CI.prediction;
+        label = false,
+        color = color
+    )
+
     vline!(
-        [ΔT_Obs_Per_Decade],
+        p,
+        [ΔT_Obs_Per_Decade];
         label = "Observed Warming",
         color = :black,
-        linestyle = :dash,
+        #linestyle = :dash,
         linewidth = 0.8
     )
 
-    # Add shaded region for observed ΔT range
     vspan!(
-        [ΔT_Obs_Per_Decade_Upper, ΔT_Obs_Per_Decade_Lower],
+        p,
+        [ΔT_Obs_Per_Decade_Upper, ΔT_Obs_Per_Decade_Lower];
+        label = false,
         fillalpha = 0.1,
-        label = "",
-        #label = "\$ ΔT_{Obs}\$/10yr : $(round(ΔT_Obs_Per_Decade, digits = 2))",
         fillcolor = :gray
     )
 
-    hline!([ΔT_SSP_Median], color = color, linewidth = 1, label = "ΔT Central Prediction",
-            #label = "\$ΔT($(period_2[2])) \$: $(round(ΔT_SSP_Median, digits = 2))")
+    hline!(
+        p,
+        [ΔT_SSP_Median];
+        label = "Central Prediction",
+        #linestyle = :dash,
+        color= color,
+        linewidth = 1
     )
-    #=
 
-    hspan!([ΔT_SSP_Lower, ΔT_SSP_Upper], alpha = .1 , color = color, label = "",
-        #label = "90% CI: $(round(ΔT_SSP_Lower, digits = 2)) - $(round(ΔT_SSP_Upper, digits = 2))")
-        )
-        =#
-    
-    plot!(Py_vals_norm, y_vals, label = false, color = color)
+    hspan!(
+        p, 
+        [ΔT_SSP_Lower, ΔT_SSP_Upper], 
+        alpha = .1 , 
+        color = color, 
+        label = "Very Likely Range (1975 - 2024)"
+    )
 
-    return plot
+    annotate!(
+    p,
+    1.5*mean(ESM_Data.ΔT_per_decade), 0.3*mean(ESM_Data.ΔT_SSP),
+    text(
+        "r = $(round(r_value, digits = 2))",
+        font("Computer Modern", 9)
+    )
+    )
+
+    return p
 end
+
 
 function plot_ΔT_distribution(results, ssp_run, period_2, confidence)
 
@@ -502,7 +707,6 @@ function plot_ΔT_distribution(results, ssp_run, period_2, confidence)
         "ssp370" => "#FFAE65",
         "ssp585" => "#FF7764"
     )
-
 
     # Extract results
     r_value = results[:r_value]
@@ -537,8 +741,7 @@ function plot_ΔT_distribution(results, ssp_run, period_2, confidence)
     return plots
 end
 
-### ========  Main Functions for Plots for Paper: ======== ###
-
+#=  Main Functions for Plots for Paper: =#
 function produce_single_constraint_future_warming(directory, period_1, end_year, ssp_run, window_size, confidence)
     plots = []
 
@@ -554,15 +757,14 @@ function produce_single_constraint_future_warming(directory, period_1, end_year,
     SSP_ΔT_Results = calculate_emergent_constraint_GLM(Delta_T_ESM_period_1_df, Delta_T_ESM_period_2_df, Delta_T_Obs_df, confidence)
 
     #SSP_ΔT_Plot = plot_ΔT_distribution(SSP_ΔT_Results, ssp_run, period_1, period_2, confidence)
-    SSP_ΔT_Plot = plot_emergent_constraint_with_distribution(SSP_ΔT_Results, ssp_run, period_2, confidence)
+    SSP_ΔT_Plot = plot_emergent_constraint_with_distribution_single(SSP_ΔT_Results, ssp_run, period_2, confidence)
 
-    savefig(SSP_ΔT_Plot, "output/Single_Future_Warming_EC_SSP245.pdf")
+    savefig(SSP_ΔT_Plot, "output/Single_Future_Warming_EC_$(ssp_run).pdf")
 
     return SSP_ΔT_Plot
 end
 
-
-function produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(directory, period_1, end_years, ssp_runs, window_size, confidence)
+function produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(directory, period_1, period_1B, end_years, ssp_runs, window_size, confidence)
 
     plots = []
 
@@ -572,25 +774,91 @@ function produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(
         for ssp_run in ssp_runs
             All_Models_1850_2100 = extract_data_for_ssp_run(directory, ssp_run)
 
-            Delta_T_ESM_period_1_df = calculate_ESM_warming_trend(All_Models_1850_2100, period_1, window_size, confidence)
+            ΔT_ESM_period_2_df =
+                calculate_ESM_warming_trend(
+                    All_Models_1850_2100,
+                    period_2,
+                    window_size,
+                    confidence
+                )
 
-            Delta_T_ESM_period_2_df = calculate_ESM_warming_trend(All_Models_1850_2100, period_2, window_size, confidence)
+            ΔT_ESM_period_1_df =
+                calculate_ESM_warming_trend(
+                    All_Models_1850_2100,
+                    period_1,
+                    window_size,
+                    confidence
+                )
 
-            Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period_1, window_size)
+            ΔT_Obs_1A_df =
+                calculate_observed_warming_trend(
+                    Delta_T_Obs_raw_df,
+                    period_1,
+                    window_size
+                )
 
-            SSP_ΔT_Results = calculate_emergent_constraint_GLM(Delta_T_ESM_period_1_df, Delta_T_ESM_period_2_df, Delta_T_Obs_df, confidence)
+            SSP_ΔT_Results_1A =
+                calculate_emergent_constraint_GLM(
+                    ΔT_ESM_period_1_df,
+                    ΔT_ESM_period_2_df,
+                    ΔT_Obs_1A_df,
+                    confidence
+                )
 
-            #SSP_ΔT_Plot = plot_ΔT_distribution(SSP_ΔT_Results, ssp_run, period_1, period_2, confidence)
-            SSP_ΔT_Plot = plot_emergent_constraint_with_distribution(SSP_ΔT_Results, ssp_run, period_2, confidence)
+            ΔT_ESM_period_1B_df =
+                calculate_ESM_warming_trend(
+                    All_Models_1850_2100,
+                    period_1B,
+                    window_size,
+                    confidence
+                )
 
-            push!(plots, SSP_ΔT_Plot)
+            ΔT_Obs_1B_df =
+                calculate_observed_warming_trend(
+                    Delta_T_Obs_raw_df,
+                    period_1B,
+                    window_size
+                )
+
+            SSP_ΔT_Results_1B =
+                calculate_emergent_constraint_GLM(
+                    ΔT_ESM_period_1B_df,
+                    ΔT_ESM_period_2_df,
+                    ΔT_Obs_1B_df,
+                    confidence
+                )
+
+            p =
+                plot_emergent_constraint_with_distribution(
+                    SSP_ΔT_Results_1A,
+                    ssp_run,
+                    period_2,
+                    confidence
+                )
+
+            plot_emergent_constraint_with_distribution!(
+                p,
+                SSP_ΔT_Results_1B,
+                ssp_run,
+                period_2,
+                confidence
+            )
+
+            push!(plots, p)
         end
     end
 
-    # Arrange the plots in a 3x4 grid
-    plot_grid = plot(plots..., layout = (3, 4), size = (1200, 1000), legend = false)
+    # Final grid
+    plot_grid = plot(
+        plots...,
+        layout = (3, 4),
+        size = (1000, 900),
+        legend = false
+    )
 
-    separate_plot = plot(plots[1], 
+    # Separate legend panel
+    separate_plot = plot(
+        plots[1],
         title = "",
         xlabel = "",
         xlims = (1, 2),
@@ -601,9 +869,60 @@ function produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(
         legend = :top
     )
 
-    combined_plot = plot(plot_grid, separate_plot, layout = @layout([a{0.85h}; b]))
+    # Shift amounts
+    x_shift = 0.36
+    y_shift = -3.20  # positive moves legend up
 
-    savefig(combined_plot, "output/Future_Warming_EC.pdf")
+    plot!(
+        separate_plot,
+        [1.02, 1.06] .+ x_shift, [14.0, 14.0] .+ y_shift,
+        color = :black,
+        linewidth = 1.2,
+        linestyle = :dash,
+        label = false
+    )
+    annotate!(
+        separate_plot,
+        1.10 + x_shift, 14.0 + y_shift,
+        text("1975 – 2019", font("Computer Modern", 8))
+    )
+
+    plot!(
+        separate_plot,
+        [1.15, 1.19] .+ x_shift, [14.0, 14.0] .+ y_shift,
+        color = :black,
+        linewidth = 1.2,
+        linestyle = :solid,
+        label = false
+    )
+    annotate!(
+        separate_plot,
+        1.23 + x_shift, 14.0 + y_shift,
+        text("1975 – 2024", font("Computer Modern", 8))
+    )
+
+    # Wider, shorter rectangle around both
+    x_box = [0.994, 1.286, 1.286, 0.994, 0.994] .+ x_shift
+    y_box = [13.5, 13.5, 14.5, 14.5, 13.5] .+ y_shift
+
+    plot!(
+        separate_plot,
+        x_box,
+        y_box;
+        linecolor = :black, 
+        linewidth = 1.0,
+        label = false,
+        color = :transparent  # transparent fill
+    )
+
+
+    combined_plot =
+        plot(plot_grid, separate_plot, layout = @layout([a{0.85h}; b]))
+
+    savefig(
+        combined_plot,
+        "output/Future_Warming_EC.pdf"
+    )
 
     return combined_plot
 end
@@ -617,11 +936,12 @@ Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom
 end_year = 2050
 ssp_run = "ssp245"
 
-period_1 = (1980, 2019)
+period_1 = (1980, 2014)
+period_1A = (1980, 2019)
 ssp_runs = ["ssp126", "ssp245", "ssp370", "ssp585"] # List of SSP runs
 end_years = [2030, 2050, 2090] # List of end years
 window_size = 11 # Smoothing window size
 confidence = 0.90 # Confidence level
 
-produce_single_constraint_future_warming(ESM_Directory, period_1, end_year, ssp_run, window_size, confidence)
-#produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(ESM_Directory, period_1, end_years, ssp_runs, window_size, confidence)
+#produce_single_constraint_future_warming(ESM_Directory, period_1, end_year, ssp_run, window_size, confidence)
+produce_emergent_constraint_future_warming_end_year_and_ssp_comparsion(ESM_Directory, period_1, period_1A, end_years, ssp_runs, window_size, confidence)

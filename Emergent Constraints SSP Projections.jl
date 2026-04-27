@@ -19,13 +19,12 @@ using SymPy
 using LsqFit
 using StatsPlots
 
+#Initialisation:
 
 cd(@__DIR__)
+default(fontfamily="Computer Modern", xlabelfontsize = 12, ylabelfontsize = 12, titlefontsize=12, legendfontsize = 10, left_margin = 20px, bottom_margin = 40px)
 
 num_steps = 1000
-
-### Plot Settings:
-default(fontfamily="Computer Modern", xlabelfontsize = 12, ylabelfontsize = 12, titlefontsize=12, legendfontsize = 10, left_margin = 20px, bottom_margin = 40px)
 
 function movingaverage(X::Vector, window_size::Int)
     half_window = floor(Int, window_size / 2)
@@ -100,7 +99,6 @@ function calculate_distribution(Data, Obs_Data, params, s)
 
     local f, σ_f
     f = x -> params[1] + params[2] * x
-    #σ_f = x -> errors[2] * std(ΔT) * sqrt(1+N + ((x - mean(ΔT))^2 / (std(ΔT))^2))
     σ_f = x ->  s * sqrt(1 + 1/N + ((x - mean(ΔT))^2 / (N*(std(ΔT))^2)))
 
     x_min, x_max = 0, 2 * mean(ΔT)
@@ -114,24 +112,6 @@ function calculate_distribution(Data, Obs_Data, params, s)
     x_values = range(x_min, stop=x_max, length=nfitx)
     y_values = range(y_min, stop=y_max, length=mfity)
 
-    #=
-
-    # Calculate Pxy, Pyx, and Py
-    for m in 1:mfity
-        y = y_values[m]
-        for n in 1:nfitx
-            x = x_values[n]
-            σ_f_x = σ_f(x)
-            P_y_given_x = pdf(Normal(f(x), σ_f_x), y)
-            Pxy[n, m] = P_x(x) * P_y_given_x
-            Pyx[m, n] = Pxy[n, m]
-        end
-        # Integrate over x to get Py
-        Py[m] = sum(Pxy[:, m]) * dx
-    end
-
-    =#
-
     # Calculate Pxy, and Py
     for m in 1:mfity
         y = y_values[m]
@@ -143,17 +123,16 @@ function calculate_distribution(Data, Obs_Data, params, s)
             P_y_given_x = (1/(sqrt(2*pi*σ_f_x^2)))*exp(-(y - f_x)^2/(2*σ_f_x^2))
             Pxy[n, m] = P_x(x) * P_y_given_x
         end
+
         # Integrate over x to get Py
         Py[m] = sum(Pxy[:, m] * dx)
     end
-
 
     # Intgrate the curve again to obtain the cumulative distributions:
 
     # Normalize Py
     Py_norm = sum(Py) * dy
     Py ./= Py_norm
-
 
     return y_values, Py
 
@@ -423,7 +402,7 @@ function calculate_emergent_constraint_cumulative(y_vals, Py_vals_norm, confiden
 
 end
 
-### ========  Main Functions for Plots for Paper: ======== ###
+#  Main Functions for Plots for Paper:#
 
 #Figure 1a: Time Series Plot of ΔT for all ESMS, as well as constraint, stratified by SSP Run
 function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_runs, window_size, period_var, confidence)
@@ -449,7 +428,12 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
         for period in period_var
             end_year = period[2]
             push!(end_years, end_year)
-            Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
+            Delta_T_ESM_df = calculate_ESM_warming_trend(
+                All_Models_1850_2100,
+                period,
+                window_size,
+                confidence
+            )
             
             for row in eachrow(Delta_T_ESM_df)
                 model = row[:Model]
@@ -473,34 +457,133 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
         end
 
         # Created a truncated version of the period_var_obs, where the end years only extend to the present day:
-        period_var_obs = [(period_var[1][1], year) for year in period_var[1][2]:final_year]
+        period_var_obs = [(period_var[1][1], year)
+                           for year in period_var[1][2]:final_year]
 
         # Calculate the Observed ΔT
         ΔT_Obs = Float64[]
         ΔT_Obs_Upper = Float64[]
         ΔT_Obs_Lower = Float64[]
 
+        # Calculate the Observed ΔT
+        ΔT_Obs_minus5 = Float64[]
+        ΔT_Obs_Upper_minus_5 = Float64[]
+        ΔT_Obs_Lower_minus_5 = Float64[]
+
         for period in period_var_obs
-            Delta_T_Obs_df = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period, window_size)
+            Delta_T_Obs_df = calculate_observed_warming_trend(
+                Delta_T_Obs_raw_df,
+                period,
+                window_size
+            )
             push!(ΔT_Obs, Delta_T_Obs_df[1, :ΔT_Obs])
             push!(ΔT_Obs_Upper, Delta_T_Obs_df[1, :ΔT_Obs_Upper])
             push!(ΔT_Obs_Lower, Delta_T_Obs_df[1, :ΔT_Obs_Lower])
         end
 
-        Delta_T_ESM_df_known = calculate_ESM_warming_trend(All_Models_1850_2100, period_var_obs[end], window_size, confidence)
-        Delta_T_Obs_df_known = calculate_observed_warming_trend(Delta_T_Obs_raw_df, period_var_obs[end], window_size)
+        for period in period_var_obs[1:end-5]
+            Delta_T_Obs_df = calculate_observed_warming_trend(
+                Delta_T_Obs_raw_df,
+                period,
+                window_size
+            )
+            push!(ΔT_Obs_minus5, Delta_T_Obs_df[1, :ΔT_Obs])
+            push!(ΔT_Obs_Upper_minus_5, Delta_T_Obs_df[1, :ΔT_Obs_Upper])
+            push!(ΔT_Obs_Lower_minus_5, Delta_T_Obs_df[1, :ΔT_Obs_Lower])
+        end
+
+        Delta_T_ESM_df_known =
+            calculate_ESM_warming_trend(
+                All_Models_1850_2100,
+                period_var_obs[end],
+                window_size,
+                confidence
+            )
+
+        Delta_T_ESM_df_known_minus5 =
+            calculate_ESM_warming_trend(
+                All_Models_1850_2100,
+                period_var_obs[end-5],
+                window_size,
+                confidence
+            )
+
+        Delta_T_Obs_df_known =
+            calculate_observed_warming_trend(
+                Delta_T_Obs_raw_df,
+                period_var_obs[end],
+                window_size
+            )
+
+        Delta_T_Obs_df_known_minus5 =
+            calculate_observed_warming_trend(
+                Delta_T_Obs_raw_df,
+                period_var_obs[end-5],
+                window_size
+            )
 
         # Create a dataframe to store the end year with the central ΔT prediction
-        ΔT_Predictions = DataFrame(End_Year = Int64[], ΔT_Prediction = Float64[], ΔT_Upper = Float64[], ΔT_Lower = Float64[])
+        ΔT_Predictions =
+            DataFrame(End_Year = Int64[],
+                      ΔT_Prediction = Float64[],
+                      ΔT_Upper = Float64[],
+                      ΔT_Lower = Float64[])
+
+        # Create a dataframe to store the end year with the central ΔT prediction
+        ΔT_Predictions_minus5 =
+            DataFrame(End_Year = Int64[],
+                      ΔT_Prediction_minus5 = Float64[],
+                      ΔT_Upper_minus5 = Float64[],
+                      ΔT_Lower_minus5 = Float64[])
 
         for i in 1:length(period_var)
             period = period_var[i]
     
-            Delta_T_ESM_df = calculate_ESM_warming_trend(All_Models_1850_2100, period, window_size, confidence)
-            results = calculate_emergent_constraint_GLM(Delta_T_ESM_df_known, Delta_T_ESM_df, Delta_T_Obs_df_known, confidence)
+            Delta_T_ESM_df =
+                calculate_ESM_warming_trend(
+                    All_Models_1850_2100,
+                    period,
+                    window_size,
+                    confidence
+                )
         
-            y_vals, Py_vals = results[:ΔT_SSP_Range], results[:P_ΔT_SSP_vals]
-            _, median, upper, lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+            results =
+                calculate_emergent_constraint_GLM(
+                    Delta_T_ESM_df_known,
+                    Delta_T_ESM_df,
+                    Delta_T_Obs_df_known,
+                    confidence
+                )
+        
+            y_vals, Py_vals =
+                results[:ΔT_SSP_Range],
+                results[:P_ΔT_SSP_vals]
+
+            _, median, upper, lower =
+                calculate_emergent_constraint_cumulative(
+                    y_vals,
+                    Py_vals,
+                    confidence
+                )
+
+            results_minus5 =
+                calculate_emergent_constraint_GLM(
+                    Delta_T_ESM_df_known_minus5,
+                    Delta_T_ESM_df,
+                    Delta_T_Obs_df_known_minus5,
+                    confidence
+                )
+        
+            y_vals_minus_5, Py_vals_minus_5 =
+                results_minus5[:ΔT_SSP_Range],
+                results_minus5[:P_ΔT_SSP_vals]
+
+            _, median_minus_5, upper_minus_5, lower_minus_5 =
+                calculate_emergent_constraint_cumulative(
+                    y_vals_minus_5,
+                    Py_vals_minus_5,
+                    confidence
+                )
 
             # Check whether median value is appropriate, if not, replace with the last value
             if abs(median) < 1E-6 && i != 1
@@ -510,38 +593,45 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
                 lower = ΔT_Predictions[!, :ΔT_Lower][i-1]
             end
 
-            push!(ΔT_Predictions, (End_Year = period[2], ΔT_Prediction = median, ΔT_Upper = upper, ΔT_Lower = lower))
+            if abs(median_minus_5) < 1E-6 && i != 1
+                println("Had to be replaced at year $(period[2])")
+                median = ΔT_Predictions_minus5[!, :ΔT_Prediction_minus5][i-1]
+                upper = ΔT_Predictions_minus5[!, :ΔT_Upper_minus5][i-1]
+                lower = ΔT_Predictions_minus5[!, :ΔT_Lower_minus5][i-1]
+            end
+
+            push!(ΔT_Predictions,
+                  (End_Year = period[2],
+                   ΔT_Prediction = median,
+                   ΔT_Upper = upper,
+                   ΔT_Lower = lower))
+
+            push!(ΔT_Predictions_minus5,
+                  (End_Year = period[2],
+                   ΔT_Prediction_minus5 = median_minus_5,
+                   ΔT_Upper_minus5 = upper_minus_5,
+                   ΔT_Lower_minus5 = lower_minus_5))
         end
 
         color = color_scheme[ssp_run]
 
-        offset = calculate_temperature_anomaly_offset(Delta_T_Obs_raw_df, period_var[1][1], window_size)
+        offset =
+            calculate_temperature_anomaly_offset(
+                Delta_T_Obs_raw_df,
+                period_var[1][1],
+                window_size
+            )
 
         # Create a plot for the time series data
         plt = plot(
             xlabel = "Year",
             ylabel = "ΔT [K]",
             title = "$(ssp_run)",
-            grid = :false,
-            label = "",  # Disable legend for individual plots
+            grid = false,
+            label = "",
             xlims = (1980, 2099),
             ylime = (0, 8),
         )
-
-        #=
-
-        # Plot the model range
-        plot!(
-            plt,
-            end_years,
-            min_vals .+ offset,
-            color =:gray,
-            linewidth = 0.5 ,
-            label = "Individual Models"
-        )
-
-        =#
-
 
         plot!(
             plt,
@@ -551,20 +641,18 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
             label = "CMIP6 ESM Range",
             linewidth = 0,
             fillalpha = 0.1,
-            color =:gray,
+            color = :gray,
             fillcolor = color
         )
 
-        
         plot!(
             plt,
             end_years,
             min_vals .+ offset,
-            color =:gray,
+            label = false,
+            color = :gray,
             linewidth = 0,
-            label = ""
         )
-
 
         # Plot all the models
         for (model, ΔT_vals) in model_ΔT
@@ -572,7 +660,7 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
                 plt,
                 end_years[1:length(ΔT_vals)],
                 ΔT_vals .+ offset,
-                label = "",
+                label = false,
                 seriestype = :line,
                 linewidth = 1,
                 color = :black,
@@ -591,24 +679,44 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
             alpha = 0.6,
             linecolor = :black,
             linewidth = 2,
-            linestyle = :dash,
+            linestyle = :dot,
             linealpha = 1,
         )
+
 
         # Plot ΔT Predictions
         plot!(
             plt,
             ΔT_Predictions[!, :End_Year],
             ΔT_Predictions[!, :ΔT_Prediction] .+ offset,
-            fillbetween = (ΔT_Predictions[!, :ΔT_Lower] .+ offset, ΔT_Predictions[!, :ΔT_Upper] .+ offset),
-            label = "Constrained ΔT ($(Int(round(confidence*100)))% Confidence)",
+            fillbetween = (
+                ΔT_Predictions[!, :ΔT_Lower] .+ offset,
+                ΔT_Predictions[!, :ΔT_Upper] .+ offset
+            ),
+            label = "Constrained ΔT (1975 - 2024, $(Int(round(confidence*100)))% Confidence)",
             seriestype = :line,
             color = color,
             linecolor = :black,
-            linewidth = 2,
+            linewidth = 1.5,
             linealpha = 1,
             alpha = 0.4
         )
+
+        # Plot ΔT Predictions
+        plot!(
+            plt,
+            ΔT_Predictions_minus5[!, :End_Year],
+            ΔT_Predictions_minus5[!, :ΔT_Prediction_minus5] .+ offset,
+            label = "Constrained ΔT (1975 - 2019, Central Prediction)",
+            seriestype = :line,
+            color = color,
+            linecolor = :black,
+            linestyle =:dash, 
+            linewidth = 1.5,
+            linealpha = 1,
+            alpha = 0.4
+        )
+
 
         # Save the ssp126 plot separately
         if ssp_run == "ssp126"
@@ -625,23 +733,22 @@ function produce_constrained_ΔT_time_series_for_SSP_Runs(directory, Delta_T_Obs
             )
         end
 
-        # Add the plot to the array of plots
         push!(plots, plt)
     end
-
-    # Combine all individual plots into a 2x2 layout
+ 
     combined_plot = plot(plots..., layout = (2, 2), legend = false)
 
-    # Add the ssp126 plot underneath the 2x2 layout
     final_plot = plot(
-        combined_plot, 
-        ssp126_plot, 
-        #layout = (2,1),
+        combined_plot,
+        ssp126_plot,
         layout = @layout([a{0.9h} ; b]),
-        size = (1000, 750)    
-        )
+        size = (1000, 750)
+    )
 
-    savefig(final_plot, "output/Delta_T_SSP_Scenarios.pdf")
+    savefig(
+        final_plot,
+        "output/Delta_T_SSP_Scenarios.pdf"
+    )
 
     return final_plot
 end
@@ -840,8 +947,6 @@ function produce_constrained_ΔT_time_series_for_all_SSP_Runs_color(directory, D
     # Combine the main plot and the bar plot into a single layout
     combined_plot = plot(plt_main, plt_bar, layout = @layout([a{0.8w} b{0.2w}]))
 
-    savefig(combined_plot, "output/Delta_T_SSP_Scenarios_Combined.pdf")
-
     return combined_plot
 end
 
@@ -882,15 +987,26 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
             min_vals, max_vals = get_min_max_values(model_ΔT)
 
             final_year = Delta_T_Obs_raw_df.Year[end] - floor(Int, window_size/2)
+            final_year_minus5 = Delta_T_Obs_raw_df.Year[end-5] - floor(Int, window_size/2)
 
             Delta_T_ESM_df_known = calculate_ESM_warming_trend(All_Models_1850_2100, (target_var[1][1], final_year), window_size, confidence)
             Delta_T_Obs_df_known = calculate_observed_warming_trend(Delta_T_Obs_raw_df, (target_var[1][1], final_year), window_size)
 
+            Delta_T_ESM_df_known_minus5 = calculate_ESM_warming_trend(All_Models_1850_2100, (target_var[1][1], final_year_minus5), window_size, confidence)
+            Delta_T_Obs_df_known_minus5 = calculate_observed_warming_trend(Delta_T_Obs_raw_df, (target_var[1][1], final_year_minus5), window_size)
+
             # Calculate the emergent constraint for the target year
             results = calculate_emergent_constraint_GLM(Delta_T_ESM_df_known, Delta_T_ESM_df, Delta_T_Obs_df_known, confidence)
-            y_vals, Py_vals = results[:ΔT_SSP_Range], results[:P_ΔT_SSP_vals]
-            _, median, upper, lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+            results_minus5 = calculate_emergent_constraint_GLM(Delta_T_ESM_df_known_minus5, Delta_T_ESM_df, Delta_T_Obs_df_known_minus5, confidence)
 
+
+            y_vals, Py_vals = results[:ΔT_SSP_Range], results[:P_ΔT_SSP_vals]
+            y_vals_minus_5, Py_vals_minus_5 = results_minus5[:ΔT_SSP_Range], results_minus5[:P_ΔT_SSP_vals]
+
+            _, median, upper, lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
+            _, median_minus_5, upper_minus_5, lower_minus_5 = calculate_emergent_constraint_cumulative(y_vals_minus_5, Py_vals_minus_5, confidence)
+
+        
             color = colors[index]
 
             # Plot the ranges of ΔT_Predictions as filled solid bars
@@ -900,6 +1016,7 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
             bar_width = 0.8  # Width of the bar
 
             offset = calculate_temperature_anomaly_offset(Delta_T_Obs_raw_df, period_var[1][1], window_size)
+
 
             plot!(
                 plt_bar[year_index],
@@ -930,6 +1047,18 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
                 [bar_constrained - bar_width / 2, bar_constrained + bar_width / 2],  # x positions for the line
                 [median, median] .+ offset,  # y positions for the line
                 seriestype = :line,
+                linecolor =:black,
+                linewidth = 1,
+                label = "",
+            )
+
+            # Add ΔT_Prediction as a line marker in the same color
+            plot!(
+                plt_bar[year_index],
+                [bar_constrained - bar_width / 2, bar_constrained + bar_width / 2],  # x positions for the line
+                [median_minus_5, median_minus_5] .+ offset,  # y positions for the line
+                seriestype = :line,
+                linestyle =:dash, 
                 linecolor =:black,
                 linewidth = 1,
                 label = "",
@@ -975,17 +1104,26 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
     
         # Get the minimum and maximum values at the target year across all models
         min_vals, max_vals = get_min_max_values(model_ΔT)
-    
+
         final_year = Delta_T_Obs_raw_df.Year[end] - floor(Int, window_size/2)
-    
+        final_year_minus5 = Delta_T_Obs_raw_df.Year[end-5] - floor(Int, window_size/2)
+
         Delta_T_ESM_df_known = calculate_ESM_warming_trend(All_Models_1850_2100, (target_var[1][1], final_year), window_size, confidence)
         Delta_T_Obs_df_known = calculate_observed_warming_trend(Delta_T_Obs_raw_df, (target_var[1][1], final_year), window_size)
-    
+
+        Delta_T_ESM_df_known_minus5 = calculate_ESM_warming_trend(All_Models_1850_2100, (target_var[1][1], final_year_minus5), window_size, confidence)
+        Delta_T_Obs_df_known_minus5 = calculate_observed_warming_trend(Delta_T_Obs_raw_df, (target_var[1][1], final_year_minus5), window_size)
+
         # Calculate the emergent constraint for the target year
         results = calculate_emergent_constraint_GLM(Delta_T_ESM_df_known, Delta_T_ESM_df, Delta_T_Obs_df_known, confidence)
+        results_minus5 = calculate_emergent_constraint_GLM(Delta_T_ESM_df_known_minus5, Delta_T_ESM_df, Delta_T_Obs_df_known_minus5, confidence)
+
         y_vals, Py_vals = results[:ΔT_SSP_Range], results[:P_ΔT_SSP_vals]
+        y_vals_minus_5, Py_vals_minus_5 = results_minus5[:ΔT_SSP_Range], results_minus5[:P_ΔT_SSP_vals]
+
         _, median, upper, lower = calculate_emergent_constraint_cumulative(y_vals, Py_vals, confidence)
-    
+        _, median_minus_5, upper_minus_5, lower_minus_5 = calculate_emergent_constraint_cumulative(y_vals_minus_5, Py_vals_minus_5, confidence)
+
         color = colors[1]
     
         # Plot the ranges of ΔT_Predictions as filled solid bars
@@ -1015,9 +1153,20 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
             seriestype = :line,
             linecolor =:black,
             linewidth = 1,
-            label = "Central Prediction",
+            label = "Central Prediction (1975 - 2024)",
         )
-    
+
+        plot!(
+            separate_plot[1],
+            [bar_constrained - bar_width / 2, bar_constrained + bar_width / 2],  # x positions for the line
+            [median_minus_5, median_minus_5] .+ offset,  # y positions for the line
+            seriestype = :line,
+            linestyle =:dash, 
+            linecolor =:black,
+            linewidth = 1,
+            label = "Central Prediction (1975 - 2019)",
+        )
+
         plot!(
             separate_plot[1],
             [bar_constrained - bar_width / 2, bar_constrained + bar_width / 2, bar_constrained + bar_width / 2, bar_constrained - bar_width / 2, bar_constrained - bar_width / 2],  # x positions for the bar
@@ -1025,10 +1174,9 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
             seriestype = :shape,
             fillcolor = color,
             linecolor =:transparent,  # Remove the outline
-            label = "Constrained ΔT ($(Int(round(100*confidence)))% Confidence)",
+            label = "Constrained ΔT (1975 - 2024, $(Int(round(100*confidence)))% Confidence)",
             alpha = 0.6
         )
-    
 
         return separate_plot
     end
@@ -1045,7 +1193,7 @@ function produce_ΔT_estimates_for_SSP_Runs(directory, Delta_T_Obs_raw_df, ssp_r
 end
 
 #Load in the Directory Path of the ESM Temperature Time Series Runs
-ESM_Directory = "data/ESM_historical_runs/"
+ESM_Directory = "data/ESM_historical_runs"
 
 #Load in the Observational Temperature Anomaly Dataset
 Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom.csv", DataFrame);
@@ -1053,7 +1201,7 @@ Delta_T_Obs_raw_df = CSV.read("data/observational_data/All_Data_Temperature_Anom
 window_size = 11 # Window Size
 confidence = 0.90 # Confidence Level
 
-end_year_var = 1980:1:2099  # End years for the time series
+end_year_var = 1980:1:2099 # End years for the time series
 target_years = (2030, 2050, 2090)
 
 period_var = [(1980, end_year) for end_year in end_year_var]
@@ -1063,4 +1211,4 @@ ssp_runs = ["ssp126", "ssp245", "ssp370", "ssp585"]
 
 #produce_constrained_ΔT_time_series_for_SSP_Runs(ESM_Directory, Delta_T_Obs_raw_df, ssp_runs, window_size, period_var, confidence)
 #produce_constrained_ΔT_time_series_for_all_SSP_Runs_color(ESM_Directory, Delta_T_Obs_raw_df, ssp_runs, window_size, period_var, confidence)
-produce_ΔT_estimates_for_SSP_Runs(ESM_Directory, Delta_T_Obs_raw_df, ssp_runs, window_size, target_var, confidence)
+produce_ΔT_estimates_for_SSP_Runs(ESM_Directory, Delta_T_Obs_raw_df, ssp_runs, window_size, target_var, confidence)  
