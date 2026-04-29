@@ -671,12 +671,12 @@ function produce_ΔT_time_series_plot_for_SSP_Run_Two_Periods(directory, Delta_T
             end_years[1:length(ΔT_Obs)],
             ΔT_Obs,
             fillbetween = (ΔT_Obs_Lower, ΔT_Obs_Upper),
-            fillcolor = :red,
+            fillcolor = :grey,
             label = "Observed ΔT",
             seriestype = :line,
             linecolor = :black,
             linewidth = 2,
-            alpha = 0.3,
+            alpha = 0.6,
             linealpha = 1
         )
 
@@ -765,12 +765,12 @@ function produce_ΔT_time_series_plot_for_SSP_Run_Two_Periods(directory, Delta_T
             end_years[1:length(ΔT_Obs)],
             ΔT_Obs,
             fillbetween = (ΔT_Obs_Lower, ΔT_Obs_Upper),
-            fillcolor = :red,
+            fillcolor = :grey,
             label = "Observed ΔT",
             seriestype = :line,
             linecolor = :black,
             linewidth = 2,
-            alpha = 0.3,
+            alpha = 0.6,
             linealpha = 1
         )
 
@@ -1434,6 +1434,6 @@ confidence = 0.90 # Confidence Level
 
 #produce_TCR_table(ESM_Directory, ssp_run, period_1, period_2, window_size, confidence)
 #produce_ΔT_time_series_plot_for_SSP_Run_One_Period(ESM_Directory, Delta_T_Obs_raw_df, ssp_run, window_size, period_var_2, confidence, TCR_ESMs_df)
-#produce_ΔT_time_series_plot_for_SSP_Run_Two_Periods(ESM_Directory, Delta_T_Obs_raw_df, ssp_run, window_size, period_var_1, period_var_2, confidence, TCR_ESMs_df)
-produce_combined_emergent_constraint_comparison_plots(ESM_Directory, period_1, period_2, ssp_run, window_size, confidence)
+produce_ΔT_time_series_plot_for_SSP_Run_Two_Periods(ESM_Directory, Delta_T_Obs_raw_df, ssp_run, window_size, period_var_1, period_var_2, confidence, TCR_ESMs_df)
+#produce_combined_emergent_constraint_comparison_plots(ESM_Directory, period_1, period_2, ssp_run, window_size, confidence)
 #plot_TCR_Robustness(ESM_Directory, period_2, ssp_run, window_size, confidence, period_var_start, period_var_end, mean_window_var)
